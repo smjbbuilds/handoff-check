@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Handoff Check · SMJB Implementation Group</title>
+<meta name="description" content="Paste a proposal or sales-call notes. Handoff Check uses NLP to pull out deliverables, deadlines, owners, money and scope risks, then builds a delivery kickoff checklist.">
+<style>
+:root{
+  --bg:#f7f5f0; --surface:#ffffff; --ink:#1b2a33; --muted:#5b6b74; --line:#e3ded3;
+  --brand:#1f4e5f; --brand-ink:#ffffff; --accent:#c8743a; --good:#2f7d4f; --warn:#b7791f; --bad:#b33a3a;
+  --chip:#eef3f4; --radius:14px; --shadow:0 1px 2px rgba(0,0,0,.05),0 8px 24px rgba(27,42,51,.06);
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#11181c; --surface:#1a2428; --ink:#e8eef0; --muted:#9fb0b7; --line:#2b383d;
+    --brand:#7fb6c7; --brand-ink:#0d1a1f; --accent:#e39a63; --good:#6cc28f; --warn:#e0b25c; --bad:#e07a7a; --chip:#223035; }
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+a{color:var(--brand)}
+.wrap{max-width:1080px;margin:0 auto;padding:0 16px}
+header.top{border-bottom:1px solid var(--line);background:var(--surface)}
+header.top .wrap{display:flex;align-items:center;justify-content:space-between;height:60px;gap:12px}
+.logo{font-weight:800;letter-spacing:.02em}
+.logo span{color:var(--muted);font-weight:500;margin-left:8px;font-size:.9rem}
+nav a{margin-left:16px;text-decoration:none;color:var(--muted);font-size:.95rem}
+nav a:hover{color:var(--ink)}
+.hero{padding:48px 0 24px}
+.hero h1{font-size:clamp(1.8rem,4vw,2.6rem);line-height:1.15;margin:0 0 12px}
+.hero p{font-size:1.1rem;color:var(--muted);max-width:720px;margin:0}
+.badge{display:inline-block;font-size:.78rem;font-weight:600;padding:3px 10px;border-radius:999px;background:var(--chip);color:var(--brand);margin-bottom:12px}
+section{padding:24px 0}
+h2{font-size:1.4rem;margin:0 0 6px}
+.sub{color:var(--muted);margin:0 0 18px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px}
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:820px){.g2,.g3,.g4{grid-template-columns:1fr}}
+.card h3{margin:0 0 8px;font-size:1.02rem}
+.card ul{margin:0;padding-left:18px}
+.card li{margin:4px 0}
+textarea{width:100%;min-height:240px;resize:vertical;border:1px solid var(--line);border-radius:10px;padding:14px;font:15px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--bg);color:var(--ink)}
+textarea:focus{outline:2px solid var(--brand);outline-offset:1px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px}
+button{font:inherit;font-weight:600;border-radius:10px;padding:10px 16px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+button.primary{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+button:hover{filter:brightness(1.05)}
+.hint{color:var(--muted);font-size:.88rem}
+#results{display:none}
+.score{display:flex;align-items:center;gap:18px}
+.dial{width:96px;height:96px;border-radius:50%;display:grid;place-items:center;font-size:1.7rem;font-weight:800;flex:none;
+  background:conic-gradient(var(--dial-color,var(--good)) calc(var(--pct,0)*1%), var(--chip) 0)}
+.dial span{background:var(--surface);width:74px;height:74px;border-radius:50%;display:grid;place-items:center}
+.stat{font-size:1.6rem;font-weight:800}
+.stat-label{color:var(--muted);font-size:.85rem}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{background:var(--chip);border-radius:999px;padding:3px 10px;font-size:.85rem}
+.flag{border-left:4px solid var(--warn);padding:8px 12px;margin:8px 0;background:var(--bg);border-radius:6px}
+.flag.bad{border-left-color:var(--bad)}
+.flag.good{border-left-color:var(--good)}
+.flag b{display:block;font-size:.92rem}
+.flag small{color:var(--muted)}
+mark{background:rgba(200,116,58,.22);color:inherit;border-radius:3px;padding:0 2px}
+table{width:100%;border-collapse:collapse;font-size:.93rem}
+th,td{text-align:left;padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-weight:600;font-size:.82rem;text-transform:uppercase;letter-spacing:.04em}
+.checklist li{list-style:none;margin:6px 0;padding-left:0}
+.checklist{padding-left:0}
+.checklist input{margin-right:8px}
+.pipeline{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:.9rem}
+.pipeline span{background:var(--chip);padding:6px 10px;border-radius:8px}
+.pipeline i{color:var(--muted);font-style:normal}
+footer{border-top:1px solid var(--line);margin-top:32px;padding:20px 0;color:var(--muted);font-size:.88rem}
+.empty{color:var(--muted);font-style:italic}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="logo">Handoff Check<span>by SMJB Implementation Group</span></div>
+    <nav><a href="#tool">Try it</a><a href="#icp">Who it's for</a><a href="#how">How the NLP works</a></nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="hero">
+    <div class="badge">Demo · NLP class project</div>
+    <h1>Catch what falls between "signed" and "started."</h1>
+    <p>Paste a proposal, scope of work or sales-call notes. Handoff Check reads it with natural language processing and pulls out the deliverables, deadlines, owners, money and vague scope language your delivery team needs before kickoff.</p>
+  </div>
+
+  <section id="tool">
+    <div class="card">
+      <h2>Analyze a handoff</h2>
+      <p class="sub">Everything runs in your browser. Nothing you paste is sent anywhere.</p>
+      <label for="input" class="hint">Proposal, SOW or call notes</label>
+      <textarea id="input" placeholder="Paste the text your sales side would hand to delivery..."></textarea>
+      <div class="row">
+        <button class="primary" id="analyze">Analyze handoff</button>
+        <button id="sample">Load a sample proposal</button>
+        <button id="clear">Clear</button>
+        <span class="hint" id="count">0 words</span>
+      </div>
+    </div>
+
+    <div id="results">
+      <div class="grid g4" style="margin-top:16px">
+        <div class="card score">
+          <div class="dial" id="dial"><span id="scoreNum">0</span></div>
+          <div><div class="stat-label">Handoff readiness</div><div id="scoreLabel" style="font-weight:700"></div></div>
+        </div>
+        <div class="card"><div class="stat" id="nDeliv">0</div><div class="stat-label">Deliverables found</div></div>
+        <div class="card"><div class="stat" id="nDates">0</div><div class="stat-label">Dates and deadlines</div></div>
+        <div class="card"><div class="stat" id="nFlags">0</div><div class="stat-label">Scope risks flagged</div></div>
+      </div>
+
+      <div class="grid g2" style="margin-top:16px">
+        <div class="card">
+          <h3>Deliverables (commitment sentences)</h3>
+          <table><thead><tr><th>Deliverable</th><th>Owner</th><th>When</th></tr></thead><tbody id="delivTable"></tbody></table>
+        </div>
+        <div class="card">
+          <h3>Scope risks</h3>
+          <div id="flags"></div>
+        </div>
+      </div>
+
+      <div class="grid g3" style="margin-top:16px">
+        <div class="card"><h3>Dates and deadlines</h3><div class="chips" id="dates"></div></div>
+        <div class="card"><h3>Money</h3><div class="chips" id="money"></div></div>
+        <div class="card"><h3>People and roles</h3><div class="chips" id="people"></div></div>
+      </div>
+
+      <div class="grid g2" style="margin-top:16px">
+        <div class="card"><h3>Key topics (TF-IDF keywords)</h3><div class="chips" id="keywords"></div><p class="hint" id="tone" style="margin-top:12px"></p></div>
+        <div class="card">
+          <h3>Kickoff checklist</h3>
+          <ul class="checklist" id="checklist"></ul>
+          <div class="row"><button id="copy">Copy checklist</button><span class="hint" id="copied"></span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="icp">
+    <h2>Who it's for: the ideal client profile</h2>
+    <p class="sub">Built for one kind of business first, so every feature answers a real problem they have.</p>
+    <div class="grid g3">
+      <div class="card"><h3>The company</h3><ul>
+        <li>Marketing, digital, SEO, web, creative and CRM/RevOps agencies, then consultancies and other professional-services firms</li>
+        <li>About 8 to 50 people (sweet spot 10 to 40)</li>
+        <li>Several client projects running at once</li>
+        <li>Work split across a CRM, a project tool, email and Slack</li></ul></div>
+      <div class="card"><h3>The buyer</h3><ul>
+        <li>Founder or CEO who still signs most deals</li>
+        <li>COO or head of operations</li>
+        <li>Client-services or account lead who owns onboarding</li></ul></div>
+      <div class="card"><h3>The pain</h3><ul>
+        <li>What sales promised isn't what delivery hears</li>
+        <li>Deadlines and owners get lost between the proposal and kickoff</li>
+        <li>Vague words like "ongoing" or "unlimited revisions" turn into scope creep</li>
+        <li>Projects start late because nobody had the full picture</li></ul></div>
+    </div>
+    <div class="grid g2" style="margin-top:16px">
+      <div class="card"><h3>Buying triggers</h3><ul>
+        <li>A new client kickoff went badly or a client complained about missed expectations</li>
+        <li>The team is growing and the founder can't be in every handoff anymore</li>
+        <li>They just bought a CRM or project tool and it isn't connected to how work really moves</li></ul></div>
+      <div class="card"><h3>What success looks like for them</h3><ul>
+        <li>Every signed deal reaches delivery with deliverables, dates and owners named</li>
+        <li>Scope risks are caught before kickoff, not in month two</li>
+        <li>Faster time from signature to first deliverable</li></ul></div>
+    </div>
+  </section>
+
+  <section id="how">
+    <h2>How the NLP works</h2>
+    <p class="sub">A small rule-based NLP pipeline written in plain JavaScript, following the class pipeline: clean → tokenize → represent → model → evaluate.</p>
+    <div class="card">
+      <div class="pipeline">
+        <span>1. Clean: normalize spacing and quotes</span><i>→</i>
+        <span>2. Sentence split and word tokenize</span><i>→</i>
+        <span>3. Represent: stopword removal, light stemming, TF-IDF across sentences</span><i>→</i>
+        <span>4. Extract: commitment verbs, date and money patterns, role and name detection, vague-scope lexicon, sentiment lexicon</span><i>→</i>
+        <span>5. Score: readiness from what's present and what's missing</span>
+      </div>
+      <ul style="margin-top:14px">
+        <li><b>Deliverables</b> are sentences with a commitment verb (deliver, build, set up, launch…) tied to a subject like "we" or a named role.</li>
+        <li><b>Dates</b> come from patterns for calendar dates, weekdays, quarters and relative phrases like "within 3 weeks."</li>
+        <li><b>Owners</b> come from role words (account manager, designer…) and capitalized names next to verbs like "will" or "owns."</li>
+        <li><b>Scope risks</b> come from a lexicon of vague or open-ended language, plus checks for anything missing, such as no price or no dates.</li>
+        <li><b>Key topics</b> use TF-IDF: words that are frequent in a few sentences but not everywhere rank highest.</li>
+      </ul>
+    </div>
+  </section>
+</main>
+
+<footer><div class="wrap">Handoff Check is a demo built for an NLP class at Miami Dade College by Sadé Bobb, SMJB Implementation Group. It's not legal or contract advice. Always review results yourself.</div></footer>
+
+<script>
+/* ===================== NLP PIPELINE ===================== */
+const STOP = new Set(("a about above after again against all am an and any are as at be because been before being below between both but by can could did do does doing down during each few for from further had has have having he her here hers herself him himself his how i if in into is it its itself just let me more most my myself no nor not of off on once only or other our ours ourselves out over own same she should so some such than that the their theirs them themselves then there these they this those through to too under until up very was we were what when where which while who whom why will with would you your yours yourself yourselves also per via etc may might must shall within each well any one two three").split(" "));
+
+const COMMIT = ["deliver","delivers","build","builds","create","creates","design","designs","set up","setup","launch","launches","provide","provides","include","includes","implement","implements","migrate","migrates","configure","configures","write","writes","produce","produces","develop","develops","install","integrate","integrates","train","trains","audit","audits","document","documents","redesign","redesigns","handle","handles","manage","manages","send","sends","prepare","prepares","report","reports","connect","connects","handled","delivered","built","created","provided","configured","managed","included","launched","designed","written","set up by"];
+const OWNER_ROLES = ["account manager","project manager","account lead","strategist","designer","developer","copywriter","writer","seo specialist","analyst","engineer","consultant","coordinator","producer","client","our team","we","agency","founder","ceo","coo","marketing manager","sales rep","sales team","delivery team","creative director"];
+const VAGUE = [
+  {re:/\bunlimited\b/i, why:"\"Unlimited\" has no ceiling. Put a number on it.", sev:"bad"},
+  {re:/\bas needed\b|\bas required\b/i, why:"\"As needed\" doesn't say who decides or how much.", sev:"bad"},
+  {re:/\bongoing\b/i, why:"\"Ongoing\" work needs an end date or a monthly cap.", sev:"warn"},
+  {re:/\basap\b|\bas soon as possible\b|\brush\b/i, why:"Urgency without a date. Ask for the real deadline.", sev:"warn"},
+  {re:/\btbd\b|\bto be determined\b|\bto be confirmed\b|\btbc\b/i, why:"Something is still undecided. Name who decides and by when.", sev:"bad"},
+  {re:/\betc\.?\b|\band more\b|\band so on\b/i, why:"\"Etc.\" hides unlisted work. List every item.", sev:"warn"},
+  {re:/\brevisions?\b(?![^.]*\b(\d+|one|two|three|four|five)\b)/i, why:"Revisions are mentioned without a number of rounds.", sev:"warn"},
+  {re:/\bbest effort\b|\btry to\b|\baim to\b|\bhopefully\b/i, why:"Soft commitment. Agree what \"done\" means.", sev:"warn"},
+  {re:/\bsupport\b(?![^.]*\b(hours?|days?|business|month|week)\b)/i, why:"Support is mentioned without hours or a time limit.", sev:"warn"},
+  {re:/\bmay also\b|\bcould also\b|\bpossibly\b|\bpotentially\b|\bif time allows\b/i, why:"Optional work. Decide if it's in or out of scope.", sev:"warn"},
+  {re:/\bsimilar\b|\bkind of\b|\bsomething like\b/i, why:"Loose reference. Attach the actual example.", sev:"warn"}
+];
+const POS = ["excited","great","love","happy","clear","agree","aligned","confident","thrilled","appreciate","excellent","smooth","easy"];
+const NEG = ["frustrated","concern","concerned","worried","problem","issue","delay","delayed","late","unhappy","confused","risk","blocker","missed","complaint","angry","struggle"];
+const MONTHS = "jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?";
+const DATE_RES = [
+  new RegExp("\\b(?:"+MONTHS+")\\.?\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,?\\s+\\d{4})?\\b","gi"),
+  new RegExp("\\b\\d{1,2}(?:st|nd|rd|th)?\\s+(?:of\\s+)?(?:"+MONTHS+")\\b","gi"),
+  /\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/g,
+  /\b(?:by|on|before|every|next|this)\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi,
+  /\b(?:within|in|after|for)\s+(?:\d+|one|two|three|four|five|six|eight|ten|twelve)\s+(?:business\s+)?(?:days?|weeks?|months?)\b/gi,
+  /\bq[1-4](?:\s+\d{4})?\b/gi,
+  /\b(?:end of|by the end of)\s+(?:the\s+)?(?:week|month|quarter|year|q[1-4])\b/gi,
+  /\b(?:weekly|monthly|biweekly|bi-weekly|quarterly)\b/gi
+];
+const MONEY_RE = /\$\s?\d{1,3}(?:,\d{3})*(?:\.\d+)?(?:\s?(?:k|m))?(?:\s?(?:\/|per)\s?(?:mo(?:nth)?|hr|hour|year|yr|week))?|\b\d{1,3}(?:,\d{3})*(?:\.\d+)?\s?(?:usd|dollars)\b/gi;
+
+function clean(t){return t.replace(/\r/g,"").replace(/[“”]/g,'"').replace(/[‘’]/g,"'").replace(/[ \t]+/g," ").trim();}
+function sentences(t){
+  return t.split(/\n+/).flatMap(line=>line.replace(/^\s*[-*•\d.)]+\s+/,"").split(/(?<=[.!?])\s+(?=[A-Z0-9"(])/))
+          .map(s=>s.trim()).filter(s=>s.length>2);
+}
+function tokenize(s){return (s.toLowerCase().match(/[a-z][a-z'-]*/g)||[]);}
+function stem(w){return w.replace(/'s$/,"").replace(/(ing|ed|es|s)$/,"").replace(/(.)\1$/,"$1");}
+function uniq(a){return [...new Set(a.map(x=>x.trim()).filter(Boolean))];}
+
+function tfidf(sents){
+  const docs=sents.map(s=>tokenize(s).filter(w=>!STOP.has(w)&&w.length>2));
+  const df={}; docs.forEach(d=>new Set(d.map(stem)).forEach(w=>df[w]=(df[w]||0)+1));
+  const score={}, surface={};
+  docs.forEach(d=>{const tf={}; d.forEach(w=>{const k=stem(w);tf[k]=(tf[k]||0)+1; if(!surface[k]||w.length<surface[k].length) surface[k]=w;});
+    Object.entries(tf).forEach(([k,c])=>{score[k]=(score[k]||0)+c*Math.log(1+docs.length/df[k]);});});
+  return Object.entries(score).filter(([k])=>df[k]>=1).sort((a,b)=>b[1]-a[1]).slice(0,12).map(([k])=>surface[k]);
+}
+function findDates(s){let out=[]; DATE_RES.forEach(re=>{(s.match(re)||[]).forEach(m=>out.push(m));}); return uniq(out);}
+function findOwners(s){
+  const low=s.toLowerCase(), out=[];
+  OWNER_ROLES.forEach(r=>{ if(new RegExp("\\b"+r+"\\b").test(low)) out.push(r==="we"||r==="our team"?"our team":r); });
+  const nameRe=/\b([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)\s+(?:will|owns|leads|is responsible|handles|manages|reviews|approves|signs)\b/g; let m;
+  while((m=nameRe.exec(s))){ if(!["We","The","Our","This","They","You","It","Client","Each","All"].includes(m[1].split(" ")[0])) out.push(m[1]); }
+  const ownerRe=/\b(?:owner|contact|lead|point of contact|poc)\s*[:\-]\s*([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/g;
+  while((m=ownerRe.exec(s))) out.push(m[1]);
+  return uniq(out);
+}
+function isCommitment(s){
+  const low=" "+s.toLowerCase()+" ";
+  const hasVerb=COMMIT.some(v=>low.includes(" "+v+" ")||low.includes(" "+v+","));
+  const hasSubject=/\b(we|we'll|our team|agency|you'll get|you will receive|includes?|deliverables?|scope)\b/i.test(s)||findOwners(s).length>0||/^\s*(build|create|design|set up|launch|deliver|write|configure|migrate|implement|produce|develop|audit|train|redesign|connect|prepare)\b/i.test(s);
+  return hasVerb&&hasSubject;
+}
+function sentiment(tokens){let p=0,n=0; tokens.forEach(w=>{if(POS.includes(w))p++; if(NEG.includes(w))n++;}); return {p,n};}
+
+function analyze(raw){
+  const text=clean(raw), sents=sentences(text), allTok=tokenize(text);
+  const deliverables=[], flags=[], datesAll=[], peopleAll=[];
+  sents.forEach(s=>{
+    const d=findDates(s), o=findOwners(s); datesAll.push(...d); peopleAll.push(...o);
+    if(isCommitment(s)) deliverables.push({text:s, owner:o.join(", "), when:d.join(", ")});
+    VAGUE.forEach(v=>{ const m=s.match(v.re); if(m) flags.push({sev:v.sev, why:v.why, term:m[0], sent:s}); });
+  });
+  const money=uniq(text.match(MONEY_RE)||[]);
+  const dates=uniq(datesAll), people=uniq(peopleAll);
+  if(!money.length) flags.push({sev:"bad", why:"No price or budget found. Delivery should know what was sold.", term:"missing price", sent:""});
+  if(!dates.length) flags.push({sev:"bad", why:"No dates or timeframes found. Add a start date and deadlines.", term:"missing dates", sent:""});
+  if(deliverables.length && !deliverables.some(d=>d.owner)) flags.push({sev:"bad", why:"No deliverable has a named owner or role.", term:"missing owners", sent:""});
+  if(!/\b(approv|sign[- ]?off|accept)/i.test(text)) flags.push({sev:"warn", why:"No approval or sign-off step mentioned. Who says a deliverable is done?", term:"missing sign-off", sent:""});
+  const ownedShare=deliverables.length?deliverables.filter(d=>d.owner).length/deliverables.length:0;
+  const datedShare=deliverables.length?deliverables.filter(d=>d.when).length/deliverables.length:0;
+  const bad=flags.filter(f=>f.sev==="bad").length, warn=flags.filter(f=>f.sev==="warn").length;
+  let score= (deliverables.length?25:0) + Math.round(20*ownedShare) + Math.round(20*datedShare) + (money.length?15:0) + (dates.length?10:0) + (/\b(approv|sign[- ]?off|accept)/i.test(text)?10:0);
+  score=Math.max(0,Math.min(100,score - bad*6 - warn*3));
+  const s=sentiment(allTok);
+  return {sents, deliverables, flags, dates, money, people, keywords:tfidf(sents), score, s, words:allTok.length};
+}
+
+/* ===================== UI ===================== */
+const $=id=>document.getElementById(id);
+const esc=s=>s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
+function chips(el,arr,empty){ el.innerHTML=arr.length?arr.map(a=>`<span class="chip">${esc(a)}</span>`).join(""):`<span class="empty">${empty}</span>`; }
+function highlight(sent,term){ if(!sent) return ""; const i=sent.toLowerCase().indexOf(term.toLowerCase()); if(i<0) return esc(sent); return esc(sent.slice(0,i))+"<mark>"+esc(sent.slice(i,i+term.length))+"</mark>"+esc(sent.slice(i+term.length)); }
+
+function buildChecklist(r){
+  const items=[];
+  items.push(`Confirm the start date${r.dates.length?" (found: "+r.dates[0]+")":""} and kickoff meeting with the client`);
+  if(r.money.length) items.push(`Match the invoice and deposit to the price in the proposal (${r.money.join(", ")})`);
+  else items.push("Get the signed price and payment terms from sales before kickoff");
+  r.deliverables.slice(0,8).forEach(d=>{
+    const short=d.text.length>90?d.text.slice(0,87)+"…":d.text;
+    items.push(`Create a task: "${short}" · owner: ${d.owner||"ASSIGN AN OWNER"} · due: ${d.when||"SET A DATE"}`);
+  });
+  uniq(r.flags.filter(f=>f.sent).map(f=>f.term.toLowerCase())).slice(0,5).forEach(t=>items.push(`Clarify "${t}" with the client and write the answer into the scope`));
+  if(!r.flags.some(f=>f.term==="missing sign-off")) items.push("Confirm who signs off on each deliverable");
+  else items.push("Agree who approves each deliverable and how (email, meeting, tool)");
+  items.push("Share this summary with the delivery team and the client before kickoff");
+  return items;
+}
+
+function render(r){
+  $("results").style.display="block";
+  const color=r.score>=75?"var(--good)":r.score>=50?"var(--warn)":"var(--bad)";
+  $("dial").style.setProperty("--pct",r.score); $("dial").style.setProperty("--dial-color",color);
+  $("scoreNum").textContent=r.score;
+  $("scoreLabel").textContent=r.score>=75?"Ready for kickoff":r.score>=50?"Needs a few answers":"Not ready to hand off";
+  $("nDeliv").textContent=r.deliverables.length; $("nDates").textContent=r.dates.length; $("nFlags").textContent=r.flags.length;
+  $("delivTable").innerHTML=r.deliverables.length? r.deliverables.map(d=>`<tr><td>${esc(d.text)}</td><td>${d.owner?esc(d.owner):'<span class="empty">none</span>'}</td><td>${d.when?esc(d.when):'<span class="empty">none</span>'}</td></tr>`).join("")
+    : `<tr><td colspan="3" class="empty">No commitment sentences found. Try text that says what you'll deliver.</td></tr>`;
+  $("flags").innerHTML=r.flags.length? r.flags.map(f=>`<div class="flag ${f.sev==="bad"?"bad":""}"><b>${esc(f.why)}</b>${f.sent?`<small>${highlight(f.sent,f.term)}</small>`:""}</div>`).join("")
+    : `<div class="flag good"><b>No vague scope language found.</b></div>`;
+  chips($("dates"),r.dates,"None found"); chips($("money"),r.money,"None found"); chips($("people"),r.people,"None found"); chips($("keywords"),r.keywords,"Not enough text");
+  const t=r.s.p>r.s.n?"mostly positive":r.s.n>r.s.p?"shows some concern":"neutral";
+  $("tone").textContent=`Tone check (sentiment lexicon): ${t} (${r.s.p} positive, ${r.s.n} concern words) across ${r.sents.length} sentences and ${r.words} words.`;
+  $("checklist").innerHTML=buildChecklist(r).map(i=>`<li><label><input type="checkbox">${esc(i)}</label></li>`).join("");
+  $("results").scrollIntoView({behavior:"smooth",block:"start"});
+}
+
+const SAMPLE=`Proposal: Website Redesign + HubSpot Setup for Brightline Dental Group
+Prepared by Northpoint Creative, March 3, 2027
+
+We will redesign the 12-page marketing website and launch it within 8 weeks of kickoff.
+Our designer will deliver homepage mockups by March 20 for client approval.
+Maria Lopez will configure HubSpot forms and connect them to the booking calendar.
+We will set up 3 email nurture sequences and provide ongoing optimization as needed.
+The client includes unlimited revisions on page copy during the design phase.
+Our account manager will send a weekly status report every Friday.
+SEO migration, redirects, etc. will be handled by our developer.
+We may also produce a short brand video if time allows.
+Total investment: $18,500, with a 50% deposit due at signing and $750/month for support after launch.
+Training for the front-desk team is TBD.`;
+
+$("sample").onclick=()=>{ $("input").value=SAMPLE; updateCount(); };
+$("clear").onclick=()=>{ $("input").value=""; $("results").style.display="none"; updateCount(); };
+$("analyze").onclick=()=>{ const v=$("input").value; if(v.trim().split(/\s+/).length<8){ $("count").textContent="Paste at least a few sentences first."; return; } render(analyze(v)); };
+$("copy").onclick=async()=>{ const txt=[...document.querySelectorAll("#checklist li")].map(li=>"☐ "+li.textContent).join("\n"); try{await navigator.clipboard.writeText(txt); $("copied").textContent="Copied";}catch(e){ $("copied").textContent="Select and copy the list manually"; } };
+function updateCount(){ const n=($("input").value.trim().match(/\S+/g)||[]).length; $("count").textContent=n+" words"; }
+$("input").addEventListener("input",updateCount);
+window.HandoffNLP={analyze};
+</script>
+</body>
+</html>
